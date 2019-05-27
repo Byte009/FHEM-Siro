@@ -724,7 +724,7 @@ sub Set($@) {
 # up/down for timer mappen auf on/off und timer für stop setzen
     if ( $comand eq 'upfortimer' ) 
 	{
-        Log3( $name, 5, "Siro_Set: up_for_timer @args $args[1]" );
+        Log3( $name, 5, "Siro_Set: up_for_timer  $args[1]" );
         $hash->{helper}{savedcmds}{cmd1} = 'stop';
         InternalTimer( time + $args[1], "FHEM::Siro::Restartset", "$name" );
     }
@@ -734,7 +734,7 @@ sub Set($@) {
 # up/down for timer mappen auf on/off und timer für stop setzen
     if ( $comand eq 'downfortimer' ) 
 	{
-        Log3( $name, 5, "Siro_Set: down_for_timer @args $args[1]" );
+        Log3( $name, 5, "Siro_Set: down_for_timer  $args[1]" );
         $hash->{helper}{savedcmds}{cmd1} = 'stop';
         InternalTimer( time + $args[1], "FHEM::Siro::Restartset", "$name" );
     }
@@ -825,7 +825,7 @@ sub Set($@) {
 	##################################################
 	##################################
 	
-	# set on ( device faeht hoch )
+	# set on ( device faeht runter )
 	if ($comand eq "on" || $comand eq "downfortimer" )
 		{
 		if ($downtime eq "undef" || $uptime eq "undef") # bei ungesetzten fahrzeiten
@@ -843,7 +843,7 @@ sub Set($@) {
 			Log3( $name, 5, "Siro - Settree: on downtime - state  $state");
 			Log3( $name, 5, "Siro - Settree: on downtime - down1time  $down1time");
 			SendCommand( $hash, 'on' );
-			SendCommand( $hash, 'stop' );
+			#SendCommand( $hash, 'stop' );
 			
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate( $hash, "aktRunningAction", $comand ) ;
@@ -855,6 +855,11 @@ sub Set($@) {
 			if ($comand eq "on")
 			{
 			readingsSingleUpdate( $hash, "state", "runningDown" , 1 ) ;
+			
+			# internen timer setzen runningtime - dann states setzen
+			Log3( $name, 5, "Siro - setze timer -$comand");
+			InternalTimer( $endaction, "FHEM::Siro::Finish", "$name" );
+			
 			}
 			else{
 			readingsSingleUpdate( $hash, "state", "runningDownfortimer" , 1 ) ;
@@ -863,14 +868,12 @@ sub Set($@) {
 			
 			
 			
-			# internen timer setzen runningtime - dann states setzen
-			Log3( $name, 5, "Siro - setze timer -$comand");
-			InternalTimer( $endaction, "FHEM::Siro::Finish", "$name" );
+			
 			#befehl ausfuhren
 		}
 		
 ##########################################
-	# set off ( device faeht runter )
+	# set off ( device faeht hoch )
 	if ($comand eq "off" || $comand eq "upfortimer" )
 		{
 		if ($downtime eq "undef" || $uptime eq "undef") # bei ungesetzten fahrzeiten
@@ -904,15 +907,17 @@ sub Set($@) {
 			if ($comand eq "off")
 				{
 				readingsSingleUpdate( $hash, "state", "runningUp" , 1 ) ;
+				
+				# internen timer setzen runningtime - dann states setzen
+			Log3( $name, 5, "Siro - setze timer -$comand");
+		    InternalTimer( $endaction, "FHEM::Siro::Finish", "$name" );
 				}
 			else
 				{
 				readingsSingleUpdate( $hash, "state", "runningUpfortimer" , 1 ) ;
 				}
 			
-			# internen timer setzen runningtime - dann states setzen
-			Log3( $name, 5, "Siro - setze timer -$comand");
-		    InternalTimer( $endaction, "FHEM::Siro::Finish", "$name" );
+			
 			#befehl ausfuhren
 		}
 		
@@ -1392,15 +1397,15 @@ set Siro1 set_favorite               programs the current roll position as hardw
 <a name="Siro"></a>
 <h3>Siro protocol</h3>
 <ul>
-   
+
    <br> Ein <a href="#SIGNALduino">SIGNALduino</a>-Geraet (dieses sollte als erstes angelegt sein).<br>
-   
+
    <br>
         Da sich die Protokolle von Siro und Dooya sehr &auml;hneln, ist ein gleichzeitiger Betrieb dieser Systeme ueber ein "IODev" derzeit schwierig. Das Senden von Befehlen funktioniert ohne Probleme, aber das Unterscheiden der Fernbedienungssignale ist in Signalduino kaum m&ouml;glich. Zum Betrieb der Siromoduls wird daher empfohlen, das Dooyaprotokoll im SIGNALduino (16) &uuml;ber die Whitelist auszuschliessen. Zur fehlerfreien Erkennung der Fernbedienungssignale ist es weiterhin erforderlich im SIGMALduino das Protokoll "manchesterMC" zu deaktivieren (disableMessagetype manchesterMC). Wird der Empfang von machestercodierten Befehlen benoetigt, wird der Betrieb eines zweiten Signalduinos empfohlen.<br>
  <br>
  <br>
 
-   
+
   <a name="Sirodefine"></a>
    <br>
   <b>Define</b>
@@ -1417,7 +1422,7 @@ Ein Autocreate (falls aktiviert), legt das Device mit der ID der Fernbedienung u
 
     Beispiele:<br><br>
     <ul>
-	<code>define Siro1 Siro AB00FC1</code><br>       erstellt ein Siro-Geraet Siro1 mit der ID: AB00FC und dem Kanal: 1<br>
+        <code>define Siro1 Siro AB00FC1</code><br>       erstellt ein Siro-Geraet Siro1 mit der ID: AB00FC und dem Kanal: 1<br>
     </ul>
   </ul>
   <br>
@@ -1431,30 +1436,35 @@ Ein Autocreate (falls aktiviert), legt das Device mit der ID der Fernbedienung u
     <pre>
     on
     off
+    up
+    down
     stop
-    pos (0..100) 
-    prog  
+    pct (0..100)
+    prog_mode_on
+    prog_mode_off
     fav
+    set_favorite
+    del_favorite
     </pre>
-    
+
     Beispiele:<br><br>
     <ul>
       <code>set Siro1 on</code><br>
       <code>set Siro1 off</code><br>
-      <code>set Siro1 position 50</code><br>
+      <code>set Siro1 pct 50</code><br>
       <code>set Siro1 fav</code><br>
       <code>set Siro1 stop</code><br>
-	  <code>set Siro1 set_favorite</code><br>
-	  <code>set Siro1 down_for_timer 5</code><br>
-	  <code>set Siro1 up_for_timer 5</code><br>
-	  <code>set Siro1 set_favorite</code><br>
+      <code>set Siro1 set_favorite</code><br>
+      <code>set Siro1 down_for_timer 5</code><br>
+      <code>set Siro1 up_for_timer 5</code><br>
+      <code>set Siro1 set_favorite</code><br>
     </ul>
     <br>
      <ul>
 set Siro1 on                           f&auml;hrt das Rollo komplett hoch (0%)<br>
 set Siro1 off                           f&auml;hrt das Rollo komplett herunter (100%)<br>
 set Siro1 stop                        stoppt die aktuelle Fahrt des Rollos<br>
-set Siro1 position 45              f&auml;hrt das Rollo zur angegebenen Position (45%)<br>
+set Siro1 pct 45              f&auml;hrt das Rollo zur angegebenen Position (45%)<br>
 set Siro1 45                           f&auml;hrt das Rollo zur angegebenen Position (45%)<br>
 set Siro1 fav                          f&auml;hrt das Rollo in die hardwarem&auml;ssig programmierte Mittelposition<br>
 et Siro1 down_for_timer 5                          f&auml;hrt das Rollo 5 Sekunden nach unten<br>
@@ -1463,16 +1473,10 @@ set Siro1 prog                       entspricht der "P2" Taste der Fernbedienung
 set Siro1 set_favorite               programmiert den aktuellen Rollostand als Hardwaremittelposition, das ATTR time_down_to_favorite wird neu berechnet und gesetzt. <br>
 </ul>
     <br>
-    Hinweise:<br><br>
-    <ul>
-      <li>Befindet sich das Modul im Programmiermodus, werden aufeinanderfolgende Stoppbefehle vom Modul erkannt, da diese zur Programmierung zwingend erforderlich sind. In diesem Modus werden die Readings und das State nicht aktualisiert. Der Modus wird nach 3 Minuten automatisch beendet. Die verbleibende Zeit im Programmiermodus wird im Reading "pro_mode" dargestellt. Die Programmierung des Rollos muss in dieser Zeit abgeschlossen sein, da das Modul andernfalls keine aufeinanderfolgenden Stoppbefehle mehr akzeptiert.
-Die Anzeige der Position, des States, ist eine ausschliesslich rechnerisch ermittelte Position, da es keinen R&uumlckkanal zu Statusmeldung gibt. Aufgrund eines ggf. verpassten Fernbedienungsbefehls, Timingproblems etc. kann es vorkommen, dass diese Anzeige ggf. mal falsche Werte anzeigt. Bei einer Fahrt in eine Endposition, ohne die Fahrt zu stoppen (set Siro1 [on/off]), werden Statusanzeige und echte Position bei Erreichen der Position jedes Mal synchronisiert. Diese ist der Hardware geschuldet und technisch leider nicht anders l&ouml;sbar.
-      </li>
-     	</ul>
-  </ul>
+
   <br>
 
-  <b>Get</b> 
+  <b>Get</b>
   <ul>N/A</ul><br>
 
   <a name="Siroattr"></a>
@@ -1482,37 +1486,6 @@ Die Anzeige der Position, des States, ist eine ausschliesslich rechnerisch ermit
     <li>IODev<br>
         Das IODev muss das physische Ger&auml;t zum Senden und Empfangen der Signale enthalten. Derzeit wird ein SIGNALduino bzw. SIGNALesp unterst?tzt.
         Ohne der Angabe des "Sende- und Empfangsmodul" "IODev" ist keine Funktion moeglich.</li><br>
-
-    
-    <a name="channel_send_mode_1 "></a>
-    <li>channel_send_mode_1 <br>
-        Beinhaltet den Kanal, der vom Modul im "operation_mode 1" zum Senden genutzt wird. 
-        Dieses Attribut wird in "operation_mode 0" nicht genutzt
-    </li><br>
-        
-		   <a name="down_limit_mode_1 "></a>
-    <li>down_limit_mode_1 <br>
-        Bei gesetztem Attribut wird das Rollo bei einem Fahrt nach unten nur bis zur angegebenen Position gefahren, egal ob das Kommando ?ber das Modul oder die Fernbedienung ausgloest wurde. Diese Funktion ist nur im Mode 1 aktiv.
-    </li><br>
-	
-		<a name="down_auto_stop "></a>
-    <li>down_auto_stop <br>
-        Bei gesetztem Attribut f?hrt das Rollo bei einer Fahrt nach unten nur bis zur angegebenen Position. Eine weiterfahrt erfolgt nach nochmaligem Befehl. Diese Funktion greift nur bei dem Kommando on ( close ) . Hierbei ist es egal, ob das Kommando ?ber das Modul oder die Fernbedienung ausgel?st wird.
-    </li><br>
-
-    <a name="operation_mode"></a>
-    <li>operation_mode<br>
-        Mode 0<br><br>
-        Dies ist der Standardmodus. In diesem Modus nutz das Modul nur den Kanal, der von der Fernbedienung vorgegeben ist.  Hier kann es durch von FHEM verpasste Signale, Timingproblemen etc. im schlechtesten Fall zu falschen States und Positionsreadings kommen. Diese werden bei Anfahrt einer Endposition wieder synchronisiert.
-        <br><br>Mode 1<br><br>
-        Erweiterter Modus. In diesem Modus nutzt das Modul zwei Kan&auml;le. Den Standardkanal "channel" zum Empfangen der Fernbedienung. Dieser sollte nicht mehr durch das Rollo selbst empfangen werden. Und den "channel_send_mode_1", zum Senden an den Rollomotor. Hierzu ist eine Umkonfigurierung des Motors erforderlich. Dieser Modus ist in Bezug auf die Darstellung der States "deutlich sicherer", da ein Verpassen eines Signals durch FHEM nicht dazu f&uumlhrt, das falsche Positionen angezeigt werden. Das Rollo f&auml;hrt nur dann, wenn FHEM das Signal empfangen hat und an den Motor weiterreicht.
-        Eine Anleitung zur Konfiguration des Motors folgt.
-    </li><br>
-
-    <a name="time_down_to_favorite"></a>
-    <li>time_down_to_favorite<br>
-        beinhaltet die Fahrtzeit in Sekunden, die das Rollo von der 0% Position bis zur Hardware-Favoriten-Mittelposition ben&ouml;tigt. Diese Zeit muss manuell gemessen werden und eingetragen werden.
-        Ohne dieses Attribut ist das Modul nur eingeschr&auml;nkt funktionsf&auml;hig.</li><br>
 
     <a name="time_to_close"></a>
     <li>time_to_close<br>
@@ -1524,15 +1497,11 @@ Die Anzeige der Position, des States, ist eine ausschliesslich rechnerisch ermit
         beinhaltet die Fahrtzeit in Sekunden, die das Rollo von der 100% Position bis zur 0% Position ben&ouml;tigt. Diese Zeit muss manuell gemessen werden und eingetragen werden.
         Ohne dieses Attribut ist das Modul nur eingeschr&auml;nkt funktionsf&auml;hig.</li><br>
 
-		 <a name="prog_fav_sequence"></a>
-    <li>prog_fav_sequence<br>
-        beinhaltet die Kommandosequenz zum Programmieren der Harware-Favoritenposition</li><br>
-
-		<a name="debug_mode [0:1]"></a>
+    <a name="debug_mode [0:1]"></a>
     <li>debug_mode [0:1] <br>
-        Im Mode 1 werden zus&auml;tzliche Readings zur Fehlerbehebung angelegt, in denen die Ausgabe aller Modulelemente ausgegeben werden. Kommandos werden NICHT physisch gesendet.</li><br>
-		
-		<a name="Info"></a>
+         unterdrueckt das Weiterleiten von Befehlen an den Signalduino</li><br>
+
+    <a name="Info"></a>
     <li>Info<br>
         Die Attribute webcmd und devStateIcon werden beim Anlegen des Devices einmalig gesetzt und im auch im Betrieb an den jeweiligen Mode des Devices angepasst. Die Anpassung dieser Inhalte geschieht nur solange, bis diese durch den Nutzer ge&auml;ndert wurden. Danach erfolgt keine automatische Anpassung mehr.</li><br>
 
