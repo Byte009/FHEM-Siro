@@ -18,6 +18,7 @@ sub Siro_Initialize($) {
     my ($hash) = @_;
 
     $hash->{SetFn}      = "FHEM::Siro::Set";
+	$hash->{MODEL} = "LE-serie";
     $hash->{NotifyFn}   = "FHEM::Siro::Notify";
     $hash->{ShutdownFn} = "FHEM::Siro::Shutdown";
 	$hash->{FW_deviceOverview} = 1;
