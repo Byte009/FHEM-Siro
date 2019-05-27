@@ -510,9 +510,9 @@ sub Set($@) {
 	my $zielposition  = $args[1]; # eingehendes set position
 	Log3( $name, 5, "Siro - Set: eingehendes komando $cmd") if $cmd ne "?";
 	### check for old version 
-	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef')
+	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef' && $cmd ne "?")
 	{
-	Log3( $name,0 , "Da Siromodul wurde geändert und die einstellungen sind nicht mehr Kompatibel. Bitte das Sirodevice \"$name\" kontrollieren .");
+	Log3( $name,0 , "Da Siromodul wurde geaendert und die einstellungen sind nicht mehr Kompatibel. Bitte das Sirodevice \"$name\" kontrollieren .");
 	
 	}
 	##################
@@ -1117,11 +1117,24 @@ sub versionchange($) {
 	CommandAttr( undef,$name . ' devStateIcon {if (ReadingsVal( $name, \'state\', \'undef\' ) =~ m/[a-z]/ ) { return \'programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down\'}else{return \'[0-9]{1,3}:fts_shutter_1w_\'.(int($state/10)*10)}}' );
     CommandAttr(undef,$name . ' webCmd stop:open:close:fav:pct');
 
+	$attr = AttrVal($name,'operation_mode','undef');
+	if ($attr eq "1"){
+	my $modch = AttrVal($name,'channel_send_mode_1','undef');
+	CommandAttr(undef,$name . ' SIRO_channel ' . $modch)
+	}
+	
+	fhem("deleteattr $name operation_mode");
+	fhem("deleteattr $name channel_send_mode_1");
+	
+	
 	fhem("deleteattr $name down_limit_mode_1");
 	fhem("deleteattr $name operation_mode");
 	fhem("deleteattr $name invers_position");
 	fhem("deleteattr $name down_auto_stop");
 	fhem("deleteattr $name prog_fav_sequence");
+	fhem("deleteattr $name time_down_to_favorite");
+	fhem("deleteattr $name time_down_to_favorite");
+	
 
 	my $seconds = ReadingsVal( $name, 'operating_seconds', '0' );
 	fhem("deletereading $name .*");
