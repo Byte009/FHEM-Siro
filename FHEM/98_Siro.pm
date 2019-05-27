@@ -18,7 +18,6 @@ sub Siro_Initialize($) {
     my ($hash) = @_;
 
     $hash->{SetFn}      = "FHEM::Siro::Set";
-	$hash->{MODEL} = "LE-serie";
     $hash->{NotifyFn}   = "FHEM::Siro::Notify";
     $hash->{ShutdownFn} = "FHEM::Siro::Shutdown";
 	$hash->{FW_deviceOverview} = 1;
@@ -212,6 +211,7 @@ sub Define($$) {
 
     my $devpointer = $hash->{ID} . $hash->{CHANNEL};
     $hash->{CODE}{ $ncode++ } = $code;
+	$hash->{MODEL} = "LE-serie";
     $modules{Siro}{defptr}{$devpointer} = $hash;
 	AssignIoPort($hash);
 	
