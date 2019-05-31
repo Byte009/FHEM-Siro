@@ -1,4 +1,4 @@
-# $Id: 98_Siro.pm 16472 2018-03-23 15:03:57Z Byte09 $
+# $Id: 98_Siro.pm 19490 2019-05-30 07:05:46Z Byte09 $
 #
 # Siro module for FHEM
 # Thanks for templates/coding from SIGNALduino team and Jarnsen_darkmission_ralf9
@@ -41,16 +41,20 @@ sub Siro_Initialize($) {
       . " SIRO_signalRepeats:1,2,3,4,5,6,7,8,9"
 	  . " SIRO_inversPosition:0,1"
 	  . " SIRO_Battery_low"
+	  . " SIRO_downLimit:slider,0,1,100"
       . " SIRO_signalLongStopRepeats:10,15,20,40,45,50"
       . " $readingFnAttributes"
 	  . " SIRO_send_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
+	  
+	  
+	  
 	  . " SIRO_send_id"
       . " SIRO_time_to_open"
       . " SIRO_time_to_close"
 	  . " SIRO_debug:0,1"
 	  
 	  #oldversion entfernen mit kommender version 
-
+      # . " SIRO_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" 
       . " SignalRepeats:1,2,3,4,5,6,7,8,9"
       . " SignalLongStopRepeats:10,15,20,40,45,50"
       . " channel_send_mode_1:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
@@ -148,6 +152,7 @@ my %sets = (
     "prog_mode_off" => "noArg",
 	"reset_motor_term" => "noArg",
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
+	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
     "state"                   => "noArg",
     "set_favorite"            => "noArg",
 	"del_favorite"            => "only_modul,only_shutter,shutter_and_modul",
@@ -159,6 +164,7 @@ my %sets = (
 my %sendCommands = (
 	"pct"         => "level",
 	"level"         => "level",
+	"position"         => "level",
     "stop"         => "stop",
 	"off"          => "off",
     "on"           => "on",
@@ -291,6 +297,17 @@ sub SendCommand($@) {
 	return;
 	
 	}
+	
+	 if ( $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
+	 {
+	 Log3( $name, 5,"Siro_sendCommand: ausführung einmalig blockiert ");
+	
+	 delete( $hash->{helper}{ignorecmd} );
+	 return;
+	
+	 }
+	
+	
 
 	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]");
 
@@ -338,8 +355,8 @@ sub SendCommand($@) {
 
 	IOWrite( $hash, 'sendMsg', $message ) if AttrVal( $name, 'SIRO_debug', "0" ) ne "1";
     Log3( $name, 5,
-"Siro_sendCommand: name -> $name command -> $cmd  channel -> $chan bincmd -> $binCommand bin -> $bin
-    message -> $message");
+"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid
+    message-$message");
 
     return $ret;
 }
@@ -669,8 +686,8 @@ sub Set($@) {
 	# setze actiontime und lastactiontime
 	# umbauen zu bulk update
 	RemoveInternalTimer($name); #alle vorhandenen timer l?schen
-	delete( $hash->{helper}{exexcmd} ); # on/off off blockiert befehlsausf?hrung / l?schen vor jedem durchgang
-	
+	#delete( $hash->{helper}{exexcmd} ); # on/off off blockiert befehlsausf?hrung / l?schen vor jedem durchgang
+	$hash->{helper}{exexcmd}="on";
 	#setze helper neu wenn signal von fb kommt
 	
 	if ($hash->{helper}{remotecmd} eq "on")
@@ -684,11 +701,43 @@ sub Set($@) {
 	readingsBulkUpdate( $hash, "LastActionTime", $lastactiontime, 0 );
 	readingsBulkUpdate( $hash, "BetweentActionTime", $betweentime, 0 );
 	readingsEndUpdate($hash, 1);
+	
+	
 	# befehl aus %sendCommands ermitteln
     my $comand = $sendCommands{$cmd}; # auzuf?hrender befehl
 	Log3( $name, 5, "Siro-Set: ermittelter Befehl: $comand " ); 
-	
-	
+
+	###############################
+	# limit testen , falls limit wird on zu level limit
+	my $downlimit = AttrVal( $name, 'SIRO_downLimit','undef' ) ;
+	if ($downlimit ne "undef"  && ($comand eq 'on' || $comand eq 'level') && $hash->{helper}{exexcmd} ne "off")
+	# nur wenn befehl nicht von fb kommt
+		{
+			if (!defined $zielposition){$zielposition = 100}
+			if ( $position < $downlimit )
+			{
+				$comand = 'level';
+				$zielposition = $downlimit;
+			}
+			my $sendchan = AttrVal( $name, 'SIRO_send_channel', 'undef' );
+			if ( $sendchan ne $hash->{CHANNEL_RECEIVE} && $position >= $downlimit )
+			{
+				return;
+			}
+		}
+##################
+	if ($downlimit ne "undef"  && ($comand eq 'on' || $comand eq 'level') && $hash->{helper}{exexcmd} eq "off")
+	# nur wenn befehl  von fb kommt
+		{
+		if ( $position < $downlimit )
+			{
+			delete( $hash->{helper}{exexcmd} );
+			$hash->{helper}{ignorecmd} ="on";
+			$comand = 'level';
+			$zielposition = $downlimit;
+			}
+		}
+############################
 	# set reset_motor_term   reset_motor_term
 	if ($comand eq "reset_motor_term")
 		{
@@ -697,7 +746,7 @@ sub Set($@) {
 		return;
 		}
 		
-	# pr?fe auf laufende aktion nur bei definierten laufzeiten
+	# pruefe auf laufende aktion nur bei definierten laufzeiten
 	# wenn vorhanden neuberechnung aller readings 
 	if ($aktendaction > time && ($downtime ne "undef" || $uptime ne "undef"))
 		{
@@ -737,6 +786,7 @@ sub Set($@) {
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate( $hash, "state", $newposition ) ;
 		readingsBulkUpdate( $hash, "pct", $newposition ) ;
+		readingsBulkUpdate( $hash, "position", $newposition) ;
 		readingsBulkUpdate( $hash, "aktRunningAction", "noAction" ) ;
 		readingsBulkUpdate( $hash, "aktEndAction", 0 ) ;
 		readingsBulkUpdate( $hash, "aktTimeAction", 0 ) ;
@@ -1096,6 +1146,7 @@ sub Finish($) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate( $hash, "state", $state  ) ;
 	readingsBulkUpdate( $hash, "pct", $state  ) ;
+	readingsBulkUpdate( $hash, "position", $state  ) ;
 	readingsBulkUpdate( $hash, "aktRunningAction", "noAction" ) ;
 	readingsBulkUpdate( $hash, "aktEndAction", 0 ) ;
 	readingsBulkUpdate( $hash, "aktTimeAction", 0 ) ;
@@ -1111,7 +1162,7 @@ sub Restartset($) {
     my ( $name, $arg ) = split( / /, $input );
     my $hash = $defs{$name};
     return "" if ( IsDisabled($name) );
-	Log3( $name, 5, "Siro-Restartset : aufgerufen");
+	Log3( $name, 0, "Siro-Restartset : aufgerufen");
 	my $cmd = $hash->{helper}{savedcmds}{cmd1};
 	my $pos = $hash->{helper}{savedcmds}{cmd2};
 	delete( $hash->{helper}{savedcmds} );
@@ -1175,6 +1226,7 @@ sub versionchange($) {
 	readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "state", "0" );
 	readingsBulkUpdate( $hash, "pct", "0" ) ;
+	readingsBulkUpdate( $hash, "position", "0" ) ;
 	readingsBulkUpdate( $hash, "motor-term", $seconds ) ;
     readingsEndUpdate( $hash, 1 );
 
@@ -1230,7 +1282,7 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 		$msg.=  $sendid ;	
 	}		
 	$msg.= " und dem Kanal:  ";
-		my $sendchan = AttrVal( $name, 'SIRO_send_channel', 'undef' );
+	my $sendchan = AttrVal( $name, 'SIRO_send_channel', 'undef' );
 	if ( $sendchan eq 'undef')
 	{
 		$msg.= $hash->{CHANNEL_RECEIVE} ;
@@ -1446,25 +1498,20 @@ set Siro1 progmode_on               enable the programming mode <br>
 
 =end html
 
-
-
-
 =begin html_DE
-
-
 
 <a name="Siro"></a>
 <h3>Siro protocol</h3>
 <ul>
-
+   
    <br> Ein <a href="#SIGNALduino">SIGNALduino</a>-Geraet (dieses sollte als erstes angelegt sein).<br>
-
+   
    <br>
         Da sich die Protokolle von Siro und Dooya sehr &auml;hneln, ist ein gleichzeitiger Betrieb dieser Systeme ueber ein "IODev" derzeit schwierig. Das Senden von Befehlen funktioniert ohne Probleme, aber das Unterscheiden der Fernbedienungssignale ist in Signalduino kaum m&ouml;glich. Zum Betrieb der Siromoduls wird daher empfohlen, das Dooyaprotokoll im SIGNALduino (16) &uuml;ber die Whitelist auszuschliessen. Zur fehlerfreien Erkennung der Fernbedienungssignale ist es weiterhin erforderlich im SIGMALduino das Protokoll "manchesterMC" zu deaktivieren (disableMessagetype manchesterMC). Wird der Empfang von machestercodierten Befehlen benoetigt, wird der Betrieb eines zweiten Signalduinos empfohlen.<br>
  <br>
  <br>
 
-
+   
   <a name="Sirodefine"></a>
    <br>
   <b>Define</b>
@@ -1481,7 +1528,7 @@ Ein Autocreate (falls aktiviert), legt das Device mit der ID der Fernbedienung u
 
     Beispiele:<br><br>
     <ul>
-        <code>define Siro1 Siro AB00FC1</code><br>       erstellt ein Siro-Geraet Siro1 mit der ID: AB00FC und dem Kanal: 1<br>
+	<code>define Siro1 Siro AB00FC1</code><br>       erstellt ein Siro-Geraet Siro1 mit der ID: AB00FC und dem Kanal: 1<br>
     </ul>
   </ul>
   <br>
@@ -1505,7 +1552,7 @@ Ein Autocreate (falls aktiviert), legt das Device mit der ID der Fernbedienung u
     set_favorite
     del_favorite
     </pre>
-
+    
     Beispiele:<br><br>
     <ul>
       <code>set Siro1 on</code><br>
@@ -1532,16 +1579,22 @@ set Siro1 progmode_on                       Das Modul wird in den Programmiermod
 set Siro1 set_favorite               programmiert den aktuellen Rollostand als Hardwaremittelposition, das ATTR time_down_to_favorite wird neu berechnet und gesetzt. <br>
 </ul>
     <br>
-
+    Hinweise:<br><br>
+    <ul>
+      <li>Befindet sich das Modul im Programmiermodus, werden aufeinanderfolgende Stoppbefehle vom Modul erkannt, da diese zur Programmierung zwingend erforderlich sind. In diesem Modus werden die Readings und das State nicht aktualisiert. Der Modus wird nach 3 Minuten automatisch beendet. Die verbleibende Zeit im Programmiermodus wird im Reading "pro_mode" dargestellt. Die Programmierung des Rollos muss in dieser Zeit abgeschlossen sein, da das Modul andernfalls keine aufeinanderfolgenden Stoppbefehle mehr akzeptiert.
+Die Anzeige der Position, des States, ist eine ausschliesslich rechnerisch ermittelte Position, da es keinen R&uumlckkanal zu Statusmeldung gibt. Aufgrund eines ggf. verpassten Fernbedienungsbefehls, Timingproblems etc. kann es vorkommen, dass diese Anzeige ggf. mal falsche Werte anzeigt. Bei einer Fahrt in eine Endposition, ohne die Fahrt zu stoppen (set Siro1 [on/off]), werden Statusanzeige und echte Position bei Erreichen der Position jedes Mal synchronisiert. Diese ist der Hardware geschuldet und technisch leider nicht anders l&ouml;sbar.
+      </li>
+     	</ul>
+  </ul>
   <br>
 
-  <b>Get</b>
+  <b>Get</b> 
   <ul>N/A</ul><br>
 
   <a name="Siroattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-    <a name="IODev"></a>
+        <a name="IODev"></a>
     <li>IODev<br>
         Das IODev muss das physische Ger&auml;t zum Senden und Empfangen der Signale enthalten. Derzeit wird ein SIGNALduino bzw. SIGNALesp unterst?tzt.
         Ohne der Angabe des "Sende- und Empfangsmodul" "IODev" ist keine Funktion moeglich.</li><br>
@@ -1578,11 +1631,11 @@ set Siro1 set_favorite               programmiert den aktuellen Rollostand als H
 
 	<a name="SIRO_sendChannel"></a>
     <li>SIRO_sendChannel <br>
-         Kanal, der zum senden genutzt wird. Wird dieses Attribut gesetz, so empfängt das Device nachwievor den ursprünglich gesetzten Kanal, sendet aber auf dem hier angegebenen Kanal </li><br>		 
+         Kanal, der zum senden genutzt wird. Wird dieses Attribut gesetz, so empfaengt das Device nachwievor den urspruenglich gesetzten Kanal, sendet aber auf dem hier angegebenen Kanal </li><br>		 
 	
-<a name="SIRO_sendID"></a>
+	<a name="SIRO_sendID"></a>
     <li>SIRO_sendID <br>
-         ID, die zum senden genutzt wird. Wird dieses Attribut gesetz, so empfängt das Device nachwievor ie ursprünglich gesetzte ID, sendet aber auf der hier angegebenen ID </li><br>		 
+         ID, die zum senden genutzt wird. Wird dieses Attribut gesetz, so empfaengt das Device nachwievor ie urspruenglich gesetzte ID, sendet aber auf der hier angegebenen ID </li><br>		 
 		 	
 	<a name="SIRO_battery_low"></a>
     <li>SIRO_battery_low <br>
@@ -1597,4 +1650,7 @@ set Siro1 set_favorite               programmiert den aktuellen Rollostand als H
 </ul>
 
 =end html_DE
+
+
+
 =cut
