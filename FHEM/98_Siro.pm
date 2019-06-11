@@ -17,7 +17,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "1.0";
+my $version = "1.1";
 
 
 sub Siro_Initialize($) {
@@ -45,14 +45,11 @@ sub Siro_Initialize($) {
       . " SIRO_signalLongStopRepeats:10,15,20,40,45,50"
       . " $readingFnAttributes"
 	  . " SIRO_send_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
-	  
-	  
-	  
 	  . " SIRO_send_id"
       . " SIRO_time_to_open"
       . " SIRO_time_to_close"
 	  . " SIRO_debug:0,1"
-	  
+	  . " SIRO_remote_correction:0,0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,2.75,3"
 	  #oldversion entfernen mit kommender version 
       # . " SIRO_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" 
       . " SignalRepeats:1,2,3,4,5,6,7,8,9"
@@ -72,7 +69,7 @@ sub Siro_Initialize($) {
       . " invers_position:0,1"
       . " prog_fav_sequence";
 	  
-	  
+	 
 	  
 
 
@@ -86,7 +83,12 @@ sub Siro_Initialize($) {
 
     $hash->{NOTIFYDEV} = "global";
 	
-	$hash->{helper}{progmode} = "off";
+	$hash->{helper}{progmode} = "off";   #exexcmd    on
+	#$hash->{helper}{exexcmd} = "on"; 
+	
+
+	
+	
 	
     FHEM::Siro::LoadHelper($hash) if ($init_done);
 }
@@ -128,6 +130,9 @@ BEGIN {
 		  attr
 		  fhem
 		  init_done
+		  setDevAttrList
+		  readingFnAttributes
+		  devspec2array 
 		  )
 
     );
@@ -140,6 +145,7 @@ my %codes = (
     "33" => "on",      # Move "down"
     "CC" => "prog",    # Programming-Mode (Remote-control-key: P2)
 );
+
 
 my %sets = (
     "open"      => "noArg",
@@ -154,15 +160,52 @@ my %sets = (
 	"sequenz"      => "noArg",
     "prog_mode_on"      => "noArg",
     "prog_mode_off" => "noArg",
+	"remote_lock" => "on,off",
 	"reset_motor_term" => "noArg",
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
 	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
-    "state"                   => "noArg",
+    #"state"                   => "noArg",
     "set_favorite"            => "noArg",
 	"del_favorite"            => "only_modul,only_shutter,shutter_and_modul",
     "down_for_timer"          => "textField",
     "up_for_timer"            => "textField"
 
+);
+
+my %setsstandart = (
+    "open"      => "noArg",
+    "close"     => "noArg",
+    "up"      => "noArg",
+    "down"     => "noArg",
+    "off"       => "noArg",
+    "stop"      => "noArg",
+    "on"        => "noArg",
+    "fav"       => "noArg",
+	"prog"      => "noArg",
+	"sequenz"      => "noArg",
+    "prog_mode_on"      => "noArg",
+    "prog_mode_off" => "noArg",
+	"remote_lock" => "on,off",
+	"reset_motor_term" => "noArg",
+    "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
+	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
+    #"state"                   => "noArg",
+    "set_favorite"            => "noArg",
+	"del_favorite"            => "only_modul,only_shutter,shutter_and_modul",
+    "down_for_timer"          => "textField",
+    "up_for_timer"            => "textField"
+
+);
+
+my %setszero = (
+    "open"      => "noArg",
+    "close"     => "noArg",
+    "up"      => "noArg",
+    "down"     => "noArg",
+    "off"       => "noArg",
+    "stop"      => "noArg",
+    "on"        => "noArg",
+    "fav"       => "noArg",
 );
 
 my %sendCommands = (
@@ -180,7 +223,8 @@ my %sendCommands = (
     "prog"         => "prog",
 	"reset_motor_term"  => "reset_motor_term",
     "up_for_timer" => "upfortimer",
-	"down_for_timer" => "downfortimer"
+	"down_for_timer" => "downfortimer",
+	"remote_lock" => "remote_lock"
 	
 );
 
@@ -203,27 +247,22 @@ sub Attr(@) {
 		if ( $aName eq "SIRO_inversPosition" ) 
 		{
 		my $oldinvers = AttrVal($name,'SIRO_inversPosition','undef');
-		Log3( $name,0 , "Siro_attr_oldinvers: $oldinvers ");
-		Log3( $name,0 , "Siro_attr_newinvers: $aVal ");
-		
-		
-			if ( $aVal ne $oldinvers) 
+		Log3( $name,5 , "Siro_attr_oldinvers: $oldinvers ");
+		Log3( $name,5 , "Siro_attr_newinvers: $aVal ");
+		if ( $aVal ne $oldinvers) 
 				{
 				my $aktstate = ReadingsVal( $name, 'state', 'undef' );
 				$aktstate = 100 - $aktstate;
-				
 				readingsSingleUpdate( $hash, "state", $aktstate , 1 );
 				readingsSingleUpdate( $hash, "pct", $aktstate , 1 );
-				
 				}
+	}
+	
+	Log3( $name,5 , "Siro_attr: $cmd, $name, $aName, $aVal ");
 	
 	}
 	
-	Log3( $name,0 , "Siro_attr: $cmd, $name, $aName, $aVal ");
-	
-	}
-	
-	Log3( $name,0 , "Siro_attr init done : $init_done");
+	Log3( $name,5 , "Siro_attr init done : $init_done");
 return;
 }
 #################################################################
@@ -263,13 +302,47 @@ sub Define($$) {
    # CommandAttr( undef,$name . ' devStateIcon {if (ReadingsVal( $name, \'state\', \'undef\' ) =~ m/[a-z]/ ) { return \'programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down\'}else{return \'[0-9]{1,3}:fts_shutter_1w_\'.(int($state/10)*10)}}' )
     #  if ( AttrVal($name,'devStateIcon','none') eq 'none' );
 
-	 	
+	
+  # attributliste anlegen 
   
-	   CommandAttr( undef,$name . ' devStateIcon {return FHEM::Siro::Siro_icon($name)}' )
+  if ($hash->{CHANNEL_RECEIVE} eq '0')
+  {
+  	my $attrzerolist =
+        " IODev"
+      . " disable:0,1"
+      . " SIRO_signalRepeats:1,2,3,4,5,6,7,8,9"
+      . " SIRO_signalLongStopRepeats:10,15,20,40,45,50"
+      . " $readingFnAttributes"
+	  . " SIRO_debug:0,1";
+	$hash->{MODEL} = "LE-Group";
+	setDevAttrList($name, $attrzerolist);
+  }
+  else
+  {
+	setDevAttrList($name, $hash->{AttrList});
+	$hash->{MODEL} = "LE-Device";
+  }
+  
+  
+  
+  
+	
+	
+	
+	
+	
+	
+	
+	my $webcmd = "webCmd stop:open:close:fav:pct";
+	$webcmd = "webCmd stop:open:close:fav" if $hash->{CHANNEL_RECEIVE} eq '0'; 
+	
+	
+  
+	CommandAttr( undef,$name . ' devStateIcon {return FHEM::Siro::Siro_icon($name)}' )
       if ( AttrVal($name,'devStateIcon','none') eq 'none' );
 	  
 	  
-    CommandAttr(undef,$name . ' webCmd stop:open:close:fav:pct')
+    CommandAttr(undef,$name . ' '.$webcmd)
       if ( AttrVal($name,'webCmd','none') eq 'none' );
 	
 	
@@ -330,7 +403,7 @@ sub SendCommand($@) {
     my $io           = $hash->{IODev};    # IO-Device (SIGNALduino)
 
 	#if ( $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
-	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
+	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
 	{
 	Log3( $name, 5,"Siro_sendCommand: ausf?hrung durch helper blockiert ");
 	return;
@@ -338,7 +411,7 @@ sub SendCommand($@) {
 	}
 	
 	 #if ( $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
-	 if ( defined($hash->{helper}) and $hash->{helper} and defined($hash->{helper}{ignorecmd}) and $hash->{helper}{ignorecmd} and $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
+	 if ( defined($hash->{helper}{ignorecmd}) and $hash->{helper}{ignorecmd} eq "on") # send kommand blockiert / keine ausf?hrung
 	 {
 	 Log3( $name, 5,"Siro_sendCommand: ausführung einmalig blockiert ");
 	
@@ -392,10 +465,9 @@ sub SendCommand($@) {
     $message = 'P72#' . $bin . '#R' . $SignalRepeats;
 
 	IOWrite( $hash, 'sendMsg', $message ) if AttrVal( $name, 'SIRO_debug', "0" ) ne "1";
-    Log3( $name, 5,
-"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid
-    message-$message");
-
+   
+    Log3( $name, 5,"Siro_sendCommand: name-$name command-$cmd  channel-$chan bincmd-$binCommand bin-$bin id-$sendid message-$message");
+    Log3( $name, 3, "Siro_sendCommand: not sent upround debugmode 1") if AttrVal( $name, 'SIRO_debug', "0" ) eq "1";
     return $ret;
 }
 
@@ -404,7 +476,7 @@ sub Parse($$) {
    
     my @args;
     my ( $hash, $msg ) = @_;
-    my $doubelmsgtime = 2;  # zeit in sek in der doppelte nachrichten blockiert werden
+    my $doubelmsgtime = 5;  # zeit in sek in der doppelte nachrichten blockiert werden
     my $favcheck = $doubelmsgtime +1;# zeit in der ein zweiter stop kommen muss/darf für fav
     my $testid  = substr( $msg, 4,  8 );
     my $testcmd = substr( $msg, 12, 2 );
@@ -414,15 +486,17 @@ sub Parse($$) {
     return "" if ( IsDisabled($name) );
 	
 	
-	if ($hash->{helper}{progmode} eq "on")
-	{
-	Log3( $name, 5, "Siro Parse deactivated cause off programmingmode");
-	return;
-	}
+	#Log3( $name, 5,"Siro_parse: Incomming msg time -> ".time);
+	
+	
+	#Log3( $name, 5,"Siro_parse: Incomming msg !  -> ".$msg);
+	
+	
+
 
     if ( my $lh = $modules{Siro}{defptr}{$testid} ) {
         my $name = $lh->{NAME};
-        Log3 $hash, 5,"Siro_Parse: Incomming msg from IODevice $testid - $name device is defined";
+       # Log3 $hash, 5,"Siro_Parse: Incomming msg from IODevice $testid - $name device is defined";
 		
 		
        # if ( defined($name)&& $testcmd ne "54")# prüfe auf doppele msg falls gerät vorhanden und cmd nicht stop
@@ -538,6 +612,15 @@ sub Parse($$) {
 
 		Log3( $name, 5, "Siro Parse Befehl:  $newstate");
 		
+		
+	if ($lh->{helper}{progmode} eq "on")
+	{
+	Log3( $name, 4, "Siro Parse deactivated cause off programmingmode");
+	return;
+	}
+	
+
+		
         if ( defined($name) ) {#device vorhanden
             my $parseaborted = 0;
             $lh->{helper}{parse_aborted} = $parseaborted;
@@ -553,15 +636,52 @@ sub Parse($$) {
 			$lh->{helper}{remotecmd} = "on"; #verhindert das senden von signalen nur wenn nicht auf anderem kanal gesendet wird
 			}
 			
-			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$hash->{helper}{remotecmd};
+			
+			
+			my $aktstate = ReadingsVal( $name, 'state', '0' );
+			my $lock =ReadingsVal( $name, 'remote_lock', 'off' );
+			
+			
+			#if (($lock ne 'on') or ($lock  eq 'on' and ($aktstate ne '0' and $aktstate ne '100'))) 
+			#{
+			
+			
+			if ($defchannnel ne '0')
+			{
+			Set( $lh, $name, $newstate );
+			}
+			else{
+			Log3 $lh, 5, "Siro_Parse: eingehender Gruppenbefehl , weiterleitung an deviceverteiler";
+			Log3 $lh, 5, "Siro_Parse: eingehender Gruppenbefehl $newstate";
+			Distributor($name.' '.$newstate.' '.$testcmd);
+			
+			return $name;
+			}
+			
+			
+			
+			
+			Log3 $lh, 5, "Siro_Parse: hash->{helper}{remotecmd} - ".$lh->{helper}{remotecmd};
 			Log3( $name, 3, "Siro-Parse ($name) : Signal FB emfangen -  $newstate");	
-            Set( $lh, $name, $newstate );
+			Log3( $name, 5, "Siro-Parse ($name) : test remote_lock - $lock");
+
+			if ($lock eq 'on')
+			# remotelock
+			{
+			Log3( $name, 5, "Siro-Parse ($name) : founde remote_lock - target: $aktstate");
+			$lh->{helper}{savedcmds}{cmd1} = 'pct' ;
+			$lh->{helper}{savedcmds}{cmd1} = 'open' if $aktstate eq "0" ;
+			$lh->{helper}{savedcmds}{cmd1} = 'close' if $aktstate eq "100" ;
+			$lh->{helper}{savedcmds}{cmd2} = $aktstate;
+			# invers noch zu berücksichtigen
+		
+			InternalTimer( (time + 0.5), "FHEM::Siro::Restartset", "$name" );
+			
+			
+			}
             return $name;
         }
     }
-	
-	
-	
     else 
 	{ # device nicht vorhanden 
         my ( undef, $rawData ) = split( "#", $msg );
@@ -585,7 +705,6 @@ sub Parse($$) {
         Log3 $hash, 5, "Siro_Parse: Channel: $channel";
         Log3 $hash, 5, "Siro_Parse: Cmd: $cmd  Newstate: $newstate";
         Log3 $hash, 5, "Siro_Parse: deviceCode: $deviceCode";
-
         Log3 $hash, 2, "Siro unknown device $deviceCode, please define it";
         return "UNDEFINED Siro_$deviceCode Siro $deviceCode";
     }
@@ -600,6 +719,7 @@ sub Set($@) {
     my ( $hash, $name, @args ) = @_;
 	my $cmd           = $args[0]; # eingehendes set
 	my $zielposition  = $args[1]; # eingehendes set position
+	my $param  = $args[1]; # eingehendes set position
 	Log3( $name, 5, "Siro-Set: eingehendes Kommando $cmd") if $cmd ne "?";
 	### check for old version 
 	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef' && $cmd ne "?")
@@ -613,6 +733,7 @@ sub Set($@) {
 	my $betweentime = $actiontime-$lastactiontime; # Zeit zwischen aktuellem und letztem Aufruf
 	my $downtime = AttrVal( $name, 'SIRO_time_to_close','undef' ); # fahrdauer runter
 	my $uptime = AttrVal( $name, 'SIRO_time_to_open','undef' ); # fahrdauer hoch
+	my $correction = AttrVal( $name, 'SIRO_remote_correction',0 ); # zeitkorrektur fernbedienung
 	my $down1time ="undef"; # fahrzeit 1 prozent
 	my $up1time ="undef"; # fahrzeit 1 prozent
 	my $drivingtime; # fahrzeit bei positionsanfahrt
@@ -625,7 +746,7 @@ sub Set($@) {
 	my $newposition ; # beinhaltet neue positin bei aktionswechsel
 	my $favposition = ReadingsVal( $name, 'Favorite-Position', 'nA' ); #gespeicherte Favoritenposition
 	my $invers = 1; #invertiert position
-	
+	my $oldcmdfrom = ReadingsVal( $name, 'ActionTrigger', 'fhem' );# ActionTrigger der letzten aktion
 	if ($downtime ne "undef" && $uptime ne "undef")
 			{
 			$down1time = $downtime/100;
@@ -653,6 +774,20 @@ sub Set($@) {
 	 $args[1] = $cmd;
 	 $cmd = "sequenz";
 	 }
+	
+	
+	
+	
+	#Log3( $name, 0, "SiroTEST $name ".$hash->{CHANNEL_RECEIVE});
+	
+	if ($hash->{CHANNEL_RECEIVE} eq '0')
+	{
+	%sets = %setszero;
+	}
+	else {
+	%sets = %setsstandart;
+	}
+	
 	
 	 if ( !exists( $sets{$cmd} ) ) {
         my @cList;
@@ -738,14 +873,31 @@ sub Set($@) {
 	$hash->{helper}{ignorecmd} = "off" ; #reset ignore send comand states
 	#setze helper neu wenn signal von fb kommt
 	#if ($hash->{helper}{remotecmd} eq "on")
+	
+	#############################
+	my $aktcmdfrom ="fhem";
 	if ( defined($hash->{helper}{remotecmd}) and $hash->{helper}{remotecmd} eq "on")
 	{
-	$hash->{helper}{exexcmd} = "off" 
+	$hash->{helper}{exexcmd} = "off" ;
+	$aktcmdfrom = "remote";
 	}
 	delete( $hash->{helper}{remotecmd} );
+	#############
+	# befehl ist von distributor abgesetzt - kam von kanal 0
+	Log3( $name, 5, "Siro-Set: param - $param");
+	if ($param eq "fakeremote")
+	{
+	$hash->{helper}{exexcmd} = "off" ;
+	$aktcmdfrom = "remote";
+	}
+	##############
+	
+	
+	
 	
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate( $hash, "ActionTime", $actiontime, 0 );
+	readingsBulkUpdate( $hash, "ActionTrigger", $aktcmdfrom, 1 );
 	readingsBulkUpdate( $hash, "LastActionTime", $lastactiontime, 0 );
 	readingsBulkUpdate( $hash, "BetweentActionTime", $betweentime, 0 );
 	readingsEndUpdate($hash, 1);
@@ -779,12 +931,22 @@ sub Set($@) {
 		{
 		if ( $position < $downlimit )
 			{
-			delete( $hash->{helper}{exexcmd} );
+			#delete( $hash->{helper}{exexcmd} );
+			$hash->{helper}{exexcmd}="on";
 			$hash->{helper}{ignorecmd} ="on";
 			$comand = 'level';
 			$zielposition = $downlimit;
 			}
 		}
+############## remote_lock		
+	if ($comand eq "remote_lock")
+		{
+		readingsSingleUpdate( $hash, "remote_lock", $args[1], 1 ) ;
+		return;
+		}
+		
+		
+		
 ############################
 	# set reset_motor_term   reset_motor_term
 	if ($comand eq "reset_motor_term")
@@ -807,8 +969,29 @@ sub Set($@) {
 		#$actiontime aktuelle zeit
 		#$aktrunningaction - typ der laufenden aktion
 		#$position -position bei actionsbeginn
+		
 		my $pastaction = $akttimeaction - ($aktendaction  - $actiontime);
 		Log3( $name, 5, "Siro-Set: unterbrochene Aktion $state lief $pastaction ");
+		##################korrektur zeitdifferenz fb/fhem
+		if ($oldcmdfrom eq "remote" and  $aktcmdfrom eq "fhem")
+		{
+		$pastaction = $pastaction + $correction ;
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion wurde von $oldcmdfrom gestartet und von $aktcmdfrom unterbrochen, starte Korrektur ");
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion $state lief $pastaction mit Korrektur");
+		Log3( $name, 5, "Siro-Set: Korrektur um $correction sekunden");
+		}
+		
+		if ($oldcmdfrom eq "fhem" and  $aktcmdfrom eq "remote")
+		{
+		$pastaction = $pastaction - $correction ;
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion wurde von $oldcmdfrom gestartet und von $aktcmdfrom unterbrochen, starte Korrektur ");
+		Log3( $name, 5, "Siro-Set: unterbrochene Aktion $state lief $pastaction mit Korrektur");
+		Log3( $name, 5, "Siro-Set: Korrektur um $correction sekunden");
+		}
+		################
+		
+		
+		
 		Log3( $name, 5, "Siro-Set: Aktionsbeginn bei $position ");
 
 		if ($state eq "runningDown" || $state eq "runningDownfortimer")
@@ -869,7 +1052,7 @@ sub Set($@) {
 			}
 		}
 
-		
+		Log3( $name, 5, "Siro-Set: cmd nach change : $comand");
 ###############		
 #pct 100 und pct 0 auf on oder off mappen
 		if ($comand eq "level" and $zielposition eq "100")
@@ -1007,10 +1190,18 @@ sub Set($@) {
 		Log3( $name, 3, "Siro-Set ($name) : set Down");	
 		if ($downtime eq "undef" || $uptime eq "undef") # bei ungesetzten fahrzeiten
 			{
-			readingsSingleUpdate( $hash, "state", "100", 1 ) ;
-			readingsSingleUpdate( $hash, "motor-term", "Function is not available without set runtime attribute, please define", 1 ) ;
+			
+			
+			readingsBeginUpdate($hash);
+			readingsBulkUpdate( $hash, "state", "100" ) ;
+			readingsBulkUpdate( $hash, "pct", "100" ) ;
+			readingsBulkUpdate( $hash, "motor-term", "Function is not available without set runtime attribute, please define") ;
+			readingsBulkUpdate( $hash, "LastAction", $comand );
+			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'on' );
-			return;
+			
+			#return;
+			
 			}
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 0; }
 			my $waytodrive = 100 - $state;
@@ -1030,6 +1221,7 @@ sub Set($@) {
 			readingsBulkUpdate( $hash, "aktEndAction", $endaction ) ;
 			readingsBulkUpdate( $hash, "aktTimeAction", $timetodrive ) ;
 			readingsBulkUpdate( $hash, "aktActionFinish", "100" ) ;
+			readingsBulkUpdate( $hash, "LastAction", $comand );
 			readingsEndUpdate( $hash, 1);
 			
 			if ($comand eq "on")
@@ -1037,7 +1229,7 @@ sub Set($@) {
 			readingsSingleUpdate( $hash, "state", "runningDown" , 1 ) ;
 			
 			# internen timer setzen runningtime - dann states setzen
-			Log3( $name, 5, "Siro-Set: setze Timer -$comand");
+			Log3( $name, 5, "Siro-Set: setze state down , setze Timer - $comand");
 			InternalTimer( $endaction, "FHEM::Siro::Finish", "$name" );
 			
 			}
@@ -1057,10 +1249,13 @@ sub Set($@) {
 			
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate( $hash, "state", "0" ) ;
+			readingsBulkUpdate( $hash, "pct", "0" ) ;
 			readingsBulkUpdate( $hash, "motor-term", "Function is not available without set runtime attribute, please define") ;
 			readingsBulkUpdate( $hash, "LastAction", $comand );
 			readingsEndUpdate( $hash, 1);
 			SendCommand( $hash, 'off' );
+			
+			#return;
 			}
 			# 
 			if ($state eq "undef" || $state eq "notAvaible") { $state = 100; }
@@ -1085,6 +1280,7 @@ sub Set($@) {
 			readingsBulkUpdate( $hash, "aktEndAction", $endaction ) ;
 			readingsBulkUpdate( $hash, "aktTimeAction", $timetodrive ) ;
 			readingsBulkUpdate( $hash, "aktActionFinish", "0" ) ;
+			readingsBulkUpdate( $hash, "LastAction", $comand );
 			readingsEndUpdate( $hash, 1);
 			
 			
@@ -1263,10 +1459,11 @@ sub Restartset($) {
     my ( $name, $arg ) = split( / /, $input );
     my $hash = $defs{$name};
     return "" if ( IsDisabled($name) );
-	Log3( $name, 0, "Siro-Restartset : aufgerufen");
+	Log3( $name, 5, "Siro-Restartset : aufgerufen");
 	my $cmd = $hash->{helper}{savedcmds}{cmd1};
 	my $pos = $hash->{helper}{savedcmds}{cmd2};
 	delete( $hash->{helper}{savedcmds} );
+	Log3( $name, 5, "Siro-Restartset : cmds $name, $cmd , $pos");
     Set($hash, $name, $cmd , $pos);
 	return;
 }
@@ -1333,15 +1530,39 @@ sub fhemwebFn($$$$) {
 my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
     my $hash     = $defs{$d};
     my $name     = $hash->{NAME};
-    return "" if ( IsDisabled($name) );
+    
 	my $progmode =$hash->{helper}{progmode};
 	Log3( $name, 5, "Siro-progmode: reached progmode $progmode");
 	if (!defined $progmode){$progmode='off';}
 	my $msg;
 
-############## versionsänderung
-# kann irgendwann entfernt werden
+############## 
+# debugmode
 	
+	if (AttrVal( $name, 'SIRO_debug', "0" ) eq "1")
+	
+	{
+	$msg.= "<table class='block wide' id='SiroWebTR'>
+			<tr class='even'>
+			<td><center>&nbsp;<br>Das Device ist im Debugmodus, es werden keine Befehle gesendet";
+	$msg.= "<br>&nbsp;<br></td></tr></table>";
+	
+	}
+############## 
+# debugmode
+	
+	if (AttrVal( $name, 'disable', "0" ) eq "1")
+	
+	{
+	$msg= "<table class='block wide' id='SiroWebTR'>
+			<tr class='even'>
+			<td><center>&nbsp;<br>Das Device ist disabled";
+	$msg.= "<br>&nbsp;<br></td></tr></table>";
+	
+	}
+	
+#######################	versionsänderung
+# kann irgendwann entfernt werden	
 	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef')
 		{
 		$msg.= "<table class='block wide' id='SiroWebTR'>
@@ -1356,9 +1577,10 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 		}
 ######################
 
+
 	if ( $progmode eq "on")
 		{
-		$msg.= "<table class='block wide' id='SiroWebTR'>
+		$msg= "<table class='block wide' id='SiroWebTR'>
 			<tr class='even'>
 			<td><center>&nbsp;<br>Programmiermodus aktiv, es werden nur folgende Befehle unterstuetzt:<br>&nbsp;<br>";
 		$msg.= "Das Anlernen ene Rollos erfolgt unter der ID: ";
@@ -1455,14 +1677,72 @@ sub Siro_icon($)
 	my ($name) = @_;
 	my $hash = $defs{$name};
 	my $state = ReadingsVal( $name, 'state', 'undef' );
+	
+	
+	if ($state =~ m/[a-z].*/){$state=0;}
+	
+	
 	my $invers = AttrVal( $name, 'SIRO_inversPosition',0 ); 
 	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(int($state/10)*10);
+	
 	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":fts_shutter_1w_".(100 - (int($state/10)*10)) if $invers eq "1";
+	
+	
+	$ret =".*:fts_shutter_all" if ($hash->{CHANNEL_RECEIVE} eq '0');
+
 	return $ret;
 	}
 
 ################
+#####################
+sub Distributor($) {
+    my ($input) = @_;
+    my ( $name, $arg, $cmd ) = split( / /, $input );
+    my $hash = $defs{$name};
+    return "" if ( IsDisabled($name) );
+	Log3( $name, 5, "Siro-Distributor : aufgerufen");
+	Log3( $name, 5, "Siro-Distributor : Befehl - $arg");
+    
+	#suche devices
+	my $devspec="TYPE=Siro:FILTER=ID=".$hash->{ID}.".*";
+	#my @list = devspec2array($devspec);
+	#Log3( $name, 5, "Siro-Distributor : betroffene devices - @list");
+	my $owndef = $hash->{ID};
+	Log3( $name, 5, "Siro-Distributor : own DEF - ".$owndef);
+	
+	my @list =qw( 1 2 3 4 5 6 7 8 9 A B C D E F); 
+	
+	foreach my $key (@list) 
+	{
+		my $targdev = $owndef.$key;
+			if (defined $modules{Siro}{defptr}{$targdev})
+			{
+			Log3( $name, 5, "Siro-Distributor : found defice kanal $key ID ".$modules{Siro}{defptr}{$targdev});
+			my $devhash = $modules{Siro}{defptr}{$targdev};
+			my $msg = "P72#".$targdev.$cmd;
+			my $devname     = $devhash->{NAME};
+			#$cmd = $codes{$cmd};
+			
+			Log3( $name, 5, "Siro-Distributor : transfer msg für $devname - $msg -$cmd"); 
+			
+			fhem( "set " . $devname . " " . $arg. " fakeremote" );
+			
+			
+			#Parse($devhash,$msg);
+			
+			
+			
+			}
+	}
+	
+	return;
+}
 
+
+
+
+
+#foreach my $testdevices(keys %{$modules{Siro}{defptr}})
 
 1;
 
