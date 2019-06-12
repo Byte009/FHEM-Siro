@@ -50,6 +50,7 @@ sub Siro_Initialize($) {
       . " SIRO_time_to_close"
 	  . " SIRO_debug:0,1"
 	  . " SIRO_remote_correction:0,0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,2.75,3"
+	  
 	  #oldversion entfernen mit kommender version 
       # . " SIRO_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" 
       . " SignalRepeats:1,2,3,4,5,6,7,8,9"
@@ -69,28 +70,18 @@ sub Siro_Initialize($) {
       . " invers_position:0,1"
       . " prog_fav_sequence";
 	  
-	 
-	  
-
-
     $hash->{AutoCreate} = {
         "Siro.*" => {
-            ATTR   => "event-min-interval:.*:300 event-on-change-reading:.*",
+            #ATTR   => "event-min-interval:.*:300 event-on-change-reading:.*",
             FILTER => "%NAME",
             autocreateThreshold => "2:10"
         }
     };
 
-    $hash->{NOTIFYDEV} = "global";
-	
+    #$hash->{NOTIFYDEV} = "global";
 	$hash->{helper}{progmode} = "off";   #exexcmd    on
 	#$hash->{helper}{exexcmd} = "on"; 
-	
-
-	
-	
-	
-    FHEM::Siro::LoadHelper($hash) if ($init_done);
+    #FHEM::Siro::LoadHelper($hash) if ($init_done);
 }
 
 
@@ -635,6 +626,8 @@ sub Parse($$) {
 			else{
 			Log3 $lh, 5, "Siro_Parse: eingehender Gruppenbefehl , weiterleitung an deviceverteiler";
 			Log3 $lh, 5, "Siro_Parse: eingehender Gruppenbefehl $newstate";
+			readingsSingleUpdate( $lh, "ActionTrigger", "remote", 1 );
+			
 			Distributor($name.' '.$newstate.' '.$testcmd);
 			
 			return $name;
@@ -799,7 +792,7 @@ sub Set($@) {
 	Log3( $name, 5, "Siro-def0: testcmd ".$sets{$cmd});
 	
 	Distributor($name.' '.$cmd.' '.$sets{$cmd});
-	
+	readingsSingleUpdate( $hash, "ActionTrigger", "fhem", 1 );
 	# name befehl befehlscode
 	$hash->{helper}{exexcmd}="on";
 	SendCommand( $hash, $sendCommands{$cmd} );
@@ -896,10 +889,12 @@ sub Set($@) {
 	#############################
 
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate( $hash, "ActionTime", $actiontime, 0 );
+	
 	readingsBulkUpdate( $hash, "ActionTrigger", $aktcmdfrom, 1 );
+	
 	readingsBulkUpdate( $hash, "LastActionTime", $lastactiontime, 0 );
 	readingsBulkUpdate( $hash, "BetweentActionTime", $betweentime, 0 );
+	readingsBulkUpdate( $hash, "ActionTime", $actiontime, 0 );
 	readingsEndUpdate($hash, 1);
 	
 	
@@ -1698,10 +1693,13 @@ sub Distributor($) {
     return "" if ( IsDisabled($name) );
 	Log3( $name, 5, "Siro-Distributor : aufgerufen");
 	Log3( $name, 5, "Siro-Distributor : Befehl - $arg");
-    
 	#suche devices
 	my $devspec="TYPE=Siro:FILTER=ID=".$hash->{ID}.".*";
-	#my @list = devspec2array($devspec);
+	my @devicelist = devspec2array($devspec);
+	shift @devicelist;
+	my $devicelist = join(" ",@devicelist);
+	
+	
 	#Log3( $name, 5, "Siro-Distributor : betroffene devices - @list");
 	my $owndef = $hash->{ID};
 	Log3( $name, 5, "Siro-Distributor : own DEF - ".$owndef);
@@ -1718,19 +1716,24 @@ sub Distributor($) {
 			my $msg = "P72#".$targdev.$cmd;
 			my $devname     = $devhash->{NAME};
 			#$cmd = $codes{$cmd};
-			
 			Log3( $name, 5, "Siro-Distributor : transfer msg für $devname - $msg -$cmd"); 
-			
 			fhem( "set " . $devname . " " . $arg. " fakeremote" );
-			
-			
-			#Parse($devhash,$msg);
-			
-			
-			
 			}
 	}
 	
+	readingsSingleUpdate( $hash, "LastAction", $arg, 1 );
+	readingsSingleUpdate( $hash, "state", $arg, 1 );
+	readingsSingleUpdate( $hash, "GroupDevices", $devicelist, 1 );
+	
+	
+	
+	
+
+	
+	delete( $hash->{Signalduino_RAWMSG} );
+	delete( $hash->{Signalduino_MSGCNT} );
+	delete( $hash->{Signalduino_RSSI} );
+	delete( $hash->{Signalduino_TIME} );
 	return;
 }
 
