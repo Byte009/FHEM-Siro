@@ -2,7 +2,7 @@
 #
 # Siro module for FHEM
 # Thanks for templates/coding from SIGNALduino team and Jarnsen_darkmission_ralf9
-# Thanks to Dr. Smagmag for decoding the protocol, which made this module possible
+# Thanks to Dr. Smag for decoding the protocol, which made this module possible
 # Needs SIGNALduino.
 # Published under GNU GPL License, v2
 # History:
@@ -17,7 +17,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "1.2";
+my $version = "1.3";
 
 
 sub Siro_Initialize($) {
@@ -657,6 +657,7 @@ sub Set($@) {
 	my $cmd           = $args[0]; # eingehendes set
 	my $zielposition  = $args[1]; # eingehendes set position
 	my $param  = $args[1]; # eingehendes set position
+	$param = "" if !defined $param;
 	Log3( $name, 5, "Siro-Set: eingehendes Kommando $cmd") if $cmd ne "?";
 	### check for old version 
 	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef' && $cmd ne "?")
@@ -830,7 +831,7 @@ sub Set($@) {
 	#############################
 	# befehl ist von distributor abgesetzt - kam von kanal 0
 	Log3( $name, 5, "Siro-Set: param - $param");
-	if (defined $param and $param eq "fakeremote")
+	if (defined $param and $param eq "fakeremote") 
 	{
 	$hash->{helper}{exexcmd} = "off" ;
 	$aktcmdfrom = "remote";
@@ -893,7 +894,7 @@ sub Set($@) {
 	if (ReadingsVal( $name, 'lock_cmd', 'off' ) eq 'on' and $param ne "fakeremote" and $hash->{helper}{exexcmd} eq "on" )
 	
 	{
-	Log3( $name, 4, "Siro-Set: angefragte Aktion abgebrochen ( lock_cmd -> on)");
+	Log3( $name, 3, "Siro-Set: angefragte Aktion $comand abgebrochen (lock_cmd -> on)");
 	readingsSingleUpdate( $hash, "pct", $position , 1 );
 	readingsSingleUpdate( $hash, "position", $position , 1 );
 	
@@ -1609,15 +1610,18 @@ sub Siro_icon(@)
 	my ($name,$icon) = @_;
 	my $hash = $defs{$name};
 	my $state = ReadingsVal( $name, 'state', 'undef' );
-
+    my $move ="stop";
+	$move = "open" if $state eq "100";
+	$move = "close" if $state eq "0";
+	
 	if ($state =~ m/[a-z].*/){$state=0;}
 	my $sticon = "fts_shutter_1w_";
 	$sticon = $icon if defined $icon;
 	
 	
 	my $invers = AttrVal( $name, 'SIRO_inversPosition',0 ); 
-	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":".$sticon.(int($state/10)*10);
-	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up runningDown.*:fts_shutter_down ".$state.":".$sticon.(100 - (int($state/10)*10)) if $invers eq "1";
+	my $ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up:stop runningDown.*:fts_shutter_down:stop ".$state.":".$sticon.(int($state/10)*10).":".$move;
+	$ret ="programming:edit_settings notAvaible:hue_room_garage runningUp.*:fts_shutter_up:stop runningDown.*:fts_shutter_down:stop ".$state.":".$sticon.(100 - (int($state/10)*10)).":".$move if $invers eq "1";
 	$ret =".*:fts_shutter_all" if ($hash->{CHANNEL_RECEIVE} eq '0');
 	$ret =".*:secur_locked\@red" if ReadingsVal( $name, 'lock_cmd', 'off' ) eq 'on';
 	
