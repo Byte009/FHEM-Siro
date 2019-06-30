@@ -1,4 +1,4 @@
-# $Id: 98_Siro.pm 19625 2019-06-15 05:15:38Z Byte09 $
+# $Id: 98_Siro.pm 19659 2019-06-20 06:33:34Z Byte09 $
 #
 # Siro module for FHEM
 # Thanks for templates/coding from SIGNALduino team and Jarnsen_darkmission_ralf9
@@ -50,6 +50,7 @@ sub Siro_Initialize($) {
       . " SIRO_time_to_close"
 	  . " SIRO_debug:0,1"
 	  . " SIRO_no_IO_msg:0,1"
+	  . " SIRO_dbl_msg_block"
 	  . " SIRO_remote_correction:0,0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,2.75,3"
 	  
 	  #oldversion entfernen mit kommender version 
@@ -157,6 +158,7 @@ my %sets = (
 	"reset_motor_term" => "noArg",
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
 	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
+	"set_favorite_position" => "slider,0,1,100",    # manuelles setzen def fav position
     #"state"                   => "noArg",
     "set_favorite"            => "noArg",
 	"del_favorite"            => "only_modul,only_shutter,shutter_and_modul",
@@ -184,6 +186,7 @@ my %setsstandart = (
     "pct" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
 	"position" => "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
     #"state"                   => "noArg",
+	"Favorite-Position" => "slider,0,1,100",    # manuelles setzen def fav position
     "set_favorite"            => "noArg",
 	"del_favorite"            => "only_modul,only_shutter,shutter_and_modul",
     "down_for_timer"          => "textField",
@@ -219,6 +222,7 @@ my %sendCommands = (
     "up_for_timer" => "upfortimer",
 	"down_for_timer" => "downfortimer",
 	"lock_remote" => "lock_remote",
+	"Favorite-Position" => "favposition",
 	"lock_cmd" => "lock_cmd"
 	
 );
@@ -396,7 +400,8 @@ sub SendCommand($@) {
 
 	Log3( $name, 4,"Siro_sendCommand: args1 - $args[1]") if defined $args[1];
 
-   if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
+   #if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
+   if ( (defined($args[1]) and $args[1] eq "longstop" ))
 		{
 			$SignalRepeats = AttrVal( $name, 'SIRO_signalLongStopRepeats', '15' );
 		}
@@ -404,6 +409,8 @@ sub SendCommand($@) {
 		{
 			 $SignalRepeats = AttrVal( $name, 'SIRO_signalRepeats', '10' );
 		}
+		
+		
 	
 	Log3( $name, 5,"Siro_sendCommand: repeats  - $SignalRepeats");
 	
@@ -443,13 +450,12 @@ sub Parse($$) {
    
     my @args;
     my ( $hash, $msg ) = @_;
-    my $doubelmsgtime = 1;  # zeit in sek in der doppelte nachrichten blockiert werden
-    my $favcheck = $doubelmsgtime + 2;# zeit in der ein zweiter stop kommen muss/darf für fav
+	my $name = $hash->{NAME};
     my $testid  = substr( $msg, 4,  8 );
     my $testcmd = substr( $msg, 12, 2 );
     my $timediff;
-
-    my $name = $hash->{NAME};
+    my $doubelmsgtime = AttrVal( $name, 'SIRO_dbl_msg_block',2 ); # zeit in sek in der doppelte nachrichten blockiert werden
+    my $favcheck = $doubelmsgtime + 2;# zeit in der ein zweiter stop kommen muss/darf für fav
 	
 	# Log3( $name, 0,"name $name");
 	
@@ -689,6 +695,9 @@ sub Parse($$) {
 				Set( $lh, $name, 'stop');
 				$lh->{helper}{savedcmds}{cmd1} = 'pct' ;
 				$lh->{helper}{savedcmds}{cmd2} = $aktstate;
+				
+				
+				RemoveInternalTimer("FHEM::Siro::Restartset", "$name");
 				InternalTimer( (time + 1), "FHEM::Siro::Restartset", "$name" );
 				return;
 				}
@@ -1222,11 +1231,19 @@ sub Set($@) {
 			}
         return;
     }
+	#################
+	# favoritenposition anpassen
+	if ( $cmd eq "Favorite-Position" )
+		{
+		Log3( $name, 5, "Siro-Set: save favposition -> $args[1]");
+		readingsSingleUpdate( $hash, "Favorite-Position",  $args[1], 1 );
+		return;
+		}
 	
 	
 	#############################
 
-	# set on ( device faeht runter )
+	# set on ( device faehrt runter )
 	if ($comand eq "on" || $comand eq "downfortimer" )
 		{
 		Log3( $name, 3, "Siro-Set ($name) : set Down");	
