@@ -1373,6 +1373,10 @@ sub Set($@) {
 		my $cmdactiontime ; # enth?lt fahrtdauer f?r gew?nschte position
 		my $directionmsg; #enth?lt actionstesxt
 		# geforderte farhtrichtung ermitteln
+		
+		
+		
+		
 		if ($state < $zielposition) # fahrt runter ben?tigt
 			{
 			$cmdpos = "on";
@@ -1388,6 +1392,13 @@ sub Set($@) {
 			$timetodrive = ($state - $zielposition) * $up1time;
 			$directionmsg ="runningUp";
 			} 
+
+		if ($state == $zielposition) # keine fahrt benötigt
+			{
+			 return;
+			} 
+
+
 
 	my $endaction = time + $timetodrive;
 	SendCommand( $hash, $cmdpos );
