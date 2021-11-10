@@ -786,13 +786,13 @@ sub Set($@) {
 
 	# versionschange
 	#changeconfig
-	
+	# off up
 	
 	
 	if (AttrVal( $name, 'SIRO_inversONOFF',0 ) eq "1")
 			 {
-				 if ($cmd eq "on"){$cmd = "off"};
-				 if ($cmd eq "off"){$cmd = "on"}; 
+				 if ($cmd eq "on"){$cmd = "up"};
+				 if ($cmd eq "off"){$cmd = "down"};  
 			 }
 	
 
@@ -1259,6 +1259,16 @@ sub Set($@) {
 	if ($comand eq "on" || $comand eq "downfortimer" )
 		{
 		Log3( $name, 3, "Siro-Set ($name) : set Down");	
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		if ($downtime eq "undef" || $uptime eq "undef") # bei ungesetzten fahrzeiten
 			{
 			readingsBeginUpdate($hash);
@@ -1273,6 +1283,9 @@ sub Set($@) {
 			my $waytodrive = 100 - $state;
 			
 			if (AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1"){$waytodrive = $state;}
+			
+			
+			
 			
 			my $timetodrive = $waytodrive * $down1time;
 			my $endaction = time + $timetodrive;
@@ -1326,6 +1339,10 @@ sub Set($@) {
 			
 			my $waytodrive = 0 + $state;
 			if (AttrVal( $name, 'SIRO_inversPosition',0 ) eq "1"){$waytodrive = 0 + (100- $state);}
+			
+		
+			
+			
 			my $timetodrive = $waytodrive * $up1time;
 			my $endaction = time + $timetodrive;
 			Log3( $name, 5, "Siro-Set: off downtime - waytodrive $waytodrive");
