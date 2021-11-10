@@ -40,6 +40,7 @@ sub Siro_Initialize($) {
       . " disable:0,1"
       . " SIRO_signalRepeats:1,2,3,4,5,6,7,8,9"
 	  . " SIRO_inversPosition:0,1"
+	  . " SIRO_inversONOFF:0,1"
 	  . " SIRO_Battery_low"
 	  . " SIRO_downLimit:slider,0,1,100"
       . " SIRO_signalLongStopRepeats:10,15,20,40,45,50"
@@ -749,6 +750,7 @@ sub Set($@) {
 	{
 	Log3( $name,0 , "Das Siromodul wurde geaendert und die einstellungen sind nicht mehr Kompatibel. Bitte das Sirodevice \"$name\" kontrollieren .");
 	}
+
 	#############################
 	
 	my $actiontime = time; # zeit dieses Aufrufes
@@ -784,6 +786,14 @@ sub Set($@) {
 
 	# versionschange
 	#changeconfig
+	
+	
+	
+	if (AttrVal( $name, 'SIRO_inversONOFF',0 ) eq "1")
+			 {
+				 if ($cmd eq "on"){$cmd = "off"};
+				 if ($cmd eq "off"){$cmd = "on"}; 
+			 }
 	
 
 	
